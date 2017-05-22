@@ -4,9 +4,13 @@
 #include <cairo.h>
 #include <sodium.h>
 
+#define C_SIZE 6
+
 struct gol_req{
   GtkWidget *drawing_area;
   cairo_surface_t *lines;
+  short int grid[140][217];
+  short int buffer[140][217];
 };
 
 //gcc `pkg-config --cflags gtk+-3.0 libsodium` -o life life.c `pkg-config --libs gtk+-3.0 libsodium`
@@ -19,6 +23,12 @@ static cairo_surface_t *lines = NULL;
 static short int grid[140][217];
 static short int buffer[140][217];
 static int r,c;
+
+// MODULO FUNCTION (NOT REMAINDER) THAT RETURNS ONLY POSITVE INTEGERS
+int mod(int a, int b){
+    int r = a % b;
+    return r < 0 ? r + b : r;
+}
 
 void init_grid(GtkWidget *da) {
   r = sizeof(grid)/sizeof(grid[0]);
@@ -36,12 +46,12 @@ void init_grid(GtkWidget *da) {
   cairo_set_line_width (cr, 0.1);
   int i, j;
   for (i = 1; i < r; i++) {
-    cairo_move_to(cr,0,(i*6));
-    cairo_line_to(cr,1302,(i*6));
+    cairo_move_to(cr,0,(i*C_SIZE));
+    cairo_line_to(cr,C_SIZE*c,(i*C_SIZE));
   }
   for (j = 1; j < c; j++) {
-    cairo_move_to(cr,(j*6),0);
-    cairo_line_to(cr,(j*6),840);
+    cairo_move_to(cr,(j*C_SIZE),0);
+    cairo_line_to(cr,(j*C_SIZE),C_SIZE*r);
   }
   cairo_stroke(cr);
   cairo_destroy(cr);
@@ -128,14 +138,14 @@ static void close_window (void) {
 
 short int do_count(short int i, short int j){
   short int count = 0;
-  count = grid[(i-1)%r][(j-1)%c] + grid[(i-1)%r][j] + grid[(i-1)%r][(j+1)%c];
-  count += grid[i][(j-1)%c] + grid[i][(j+1)%c];
-  count += grid[(i+1)%r][(j-1)%c] + grid[(i+1)%r][j] + grid [(i+1)%r][(j+1)%c];
+  count = grid[mod(i-1,r)][mod(j-1,c)] + grid[mod(i-1,r)][j] + grid[mod(i-1,r)][mod(j+1,c)];
+  count += grid[i][mod(j-1,c)] + grid[i][mod(j+1,c)];
+  count += grid[mod(i+1,r)][mod(j-1,c)] + grid[mod(i+1,r)][j] + grid [mod(i+1,r)][mod(j+1,c)];
   return count;
 }
 
-gboolean game_of_life(GtkWidget *da) {
-  // struct gol_req info = *((struct gol_req *)data);
+gboolean game_of_life(gpointer data) {
+  struct gol_req *info = (struct gol_req *)data;
   short int i,j;
   cairo_t *cr;
   short int count;
@@ -167,12 +177,12 @@ gboolean game_of_life(GtkWidget *da) {
         }
       }
       if (color == 1) {
-        cairo_rectangle (cr, 6*j, 6*i, 6, 6);
+        cairo_rectangle (cr, C_SIZE*j, C_SIZE*i, C_SIZE, C_SIZE);
       }
     }
   }
   cairo_fill (cr);
-  gtk_widget_queue_draw (da);
+  gtk_widget_queue_draw (info->drawing_area);
   for ( i = 0; i < r; i++) {
     for ( j = 0; j < c; j++) {
       grid[i][j] = buffer[i][j];
@@ -234,10 +244,10 @@ activate (GtkApplication *app,
   //-------------------- SET PERIODIC EXECUTION OF GAME OF LIFE --------------------
   // g_time_out makes a periodic call to a specified function
   init_grid (drawing_area);
-  struct gol_req info;
-  // info.drawing_area = drawing_area;
-  // info.lines = lines;
-  g_timeout_add_full (G_PRIORITY_HIGH, (guint)26, (GSourceFunc)game_of_life, drawing_area, NULL);
+  struct gol_req *info = malloc(sizeof(struct gol_req));
+  info->drawing_area = drawing_area;
+  info->lines = lines;
+  g_timeout_add_full (G_PRIORITY_HIGH, (guint)26, (GSourceFunc)game_of_life, (gpointer)info, NULL);
 }
 
 
