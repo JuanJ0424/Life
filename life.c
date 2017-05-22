@@ -21,8 +21,8 @@ static short int buffer[140][217];
 static int r,c;
 
 void init_grid(GtkWidget *da) {
-  r = (sizeof(grid)/sizeof(grid[0]))-1;
-  c = (sizeof(grid[0])/sizeof(grid[0][0])-1);
+  r = sizeof(grid)/sizeof(grid[0]);
+  c = sizeof(grid[0])/sizeof(grid[0][0]);
   double x1, y1, x2, y2;
   cairo_t *cr;
   cr = cairo_create(surface); //  Copy current state of surface in to another surface
@@ -35,11 +35,11 @@ void init_grid(GtkWidget *da) {
   cairo_set_source_rgb(cr, 0, 0, 0);
   cairo_set_line_width (cr, 0.1);
   int i, j;
-  for (i = 1; i < r+1; i++) {
+  for (i = 1; i < r; i++) {
     cairo_move_to(cr,0,(i*6));
     cairo_line_to(cr,1302,(i*6));
   }
-  for (j = 1; j < c+1; j++) {
+  for (j = 1; j < c; j++) {
     cairo_move_to(cr,(j*6),0);
     cairo_line_to(cr,(j*6),840);
   }
@@ -48,8 +48,8 @@ void init_grid(GtkWidget *da) {
   cairo_create(surface);
   cairo_set_source_surface (cr,lines, 0, 0);
   cairo_paint(cr);
-  for (i = 0; i < r+1; i++) {
-    for (j = 0; j < c+1; j++) {
+  for (i = 0; i < r; i++) {
+    for (j = 0; j < c; j++) {
       grid[i][j] = randombytes_uniform(2);
     }
   }
@@ -129,59 +129,8 @@ static void close_window (void) {
 short int do_count(short int i, short int j){
   short int count = 0;
   count = grid[(i-1)%r][(j-1)%c] + grid[(i-1)%r][j] + grid[(i-1)%r][(j+1)%c];
-  count += grid[][] + grid[][];
-  count += grid[][] + grid[][] + grid [][];
-
-  if (i !=0 && j != 0){ // Center cells
-    count = grid[i-1][j-1] + grid[i-1][j] + grid[i-1][j+1];
-    count += grid[i][j-1] + grid[i][j+1];
-    count += grid[i+1][j-1] + grid[i+1][j] + grid[i+1][j+1];
-  } else if ((i == 0||i == r) && !(j==0||j==c)) {
-    //printf("Top cell %d %d\n",i,j);
-    if (i == 0) { // Top cells
-      count = grid[r][j-1] + grid[r][j] + grid[r][j+1];
-      count += grid[0][j-1] + grid[0][j+1];
-      count += grid[1][j-1] + grid [1][j] + grid[1][j+1];
-    } else { //(i==r)  Bottom cells
-      //printf("Bottom cell %d %d\n",i,j);
-      count = grid[r-1][j-1] + grid[r-1][j] + grid[r-1][j+1];
-      count += grid[r][j-1] + grid[r][j+1];
-      count += grid[0][j-1] + grid [0][j] + grid[0][j+1];
-    }
-  }else if ((j == 0||j==c) && !(i==0||i==r)) {
-    //printf("FC cell %d %d\n",i,j);
-    if (j == 0){  // First column cells
-      count = grid[i-1][c] + grid[i-1][0] + grid[i-1][1];
-      count += grid[i][c] + grid[i][1];
-      count += grid[i+1][c] + grid [i+1][0] + grid[i+1][1];
-    } else { // (j == c) Last column cells
-      count = grid[i-1][c-1] + grid[i-1][c] + grid[i-1][0];
-      count += grid[i][c-1] + grid[i][0];
-      count += grid[i+1][c-1] + grid [i+1][c] + grid[i+1][0];
-    }
-  } else if(i == 0 && j == 0){ // Top left cell
-    count = grid[r][c] + grid[r][0] + grid[r][1];
-    count += grid[0][c] + grid[0][1];
-    count += grid[1][c] + grid [1][0] + grid[1][1];
-  } else if(i== 0 && j == c){ // Top right cell
-    count = grid[r][c-1] + grid[r][c] + grid[r][0];
-    count += grid[0][c-1] + grid[0][0];
-    count += grid[1][c-1] + grid [1][c] + grid[1][0];
-  } else if (i == r && j== 0) { // Botton left
-    count = grid[r-1][c] + grid[r-1][0] + grid[r-1][1];
-    count += grid[r][c] + grid[1][1];
-    count += grid[0][c] + grid [0][0] + grid[0][1];
-  } else if (i == r && j == c) { //Bottom right
-    count = grid[r-1][c-1] + grid[r-1][c] + grid[r-1][0];
-    count += grid[r][c-1] + grid[r][0];
-    count += grid[0][c-1] + grid [0][r] + grid[0][0];
-  } else if (i == r) { // Bottom cells
-    //printf("Bottom cell %d %d\n",i,j);
-    count = grid[r-1][j-1] + grid[r-1][j] + grid[r-1][j+1];
-    count += grid[r][j-1] + grid[r][j+1];
-    count += grid[0][j-1] + grid [0][j] + grid[0][j+1];
-  }
-
+  count += grid[i][(j-1)%c] + grid[i][(j+1)%c];
+  count += grid[(i+1)%r][(j-1)%c] + grid[(i+1)%r][j] + grid [(i+1)%r][(j+1)%c];
   return count;
 }
 
@@ -197,8 +146,8 @@ gboolean game_of_life(GtkWidget *da) {
   cairo_destroy (cr);
   cr = cairo_create (surface);
   cairo_set_source_rgb(cr, 0, 0, 0);
-  for (i = 0; i < r+1  ; i++) {
-    for (j = 0; j < c+1 ; j++) {
+  for (i = 0; i < r  ; i++) {
+    for (j = 0; j < c ; j++) {
       count = do_count(i,j);
       if (grid[i][j] == 1) {
         if (count == 2 || count == 3) {
@@ -224,8 +173,8 @@ gboolean game_of_life(GtkWidget *da) {
   }
   cairo_fill (cr);
   gtk_widget_queue_draw (da);
-  for ( i = 0; i < r+1; i++) {
-    for ( j = 0; j < c+1; j++) {
+  for ( i = 0; i < r; i++) {
+    for ( j = 0; j < c; j++) {
       grid[i][j] = buffer[i][j];
     }
   }
@@ -288,6 +237,8 @@ activate (GtkApplication *app,
   struct gol_req info;
   // info.drawing_area = drawing_area;
   // info.lines = lines;
+  r+=1;
+  c+=1;
   g_timeout_add_full (G_PRIORITY_HIGH, (guint)26, (GSourceFunc)game_of_life, drawing_area, NULL);
 }
 
