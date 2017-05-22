@@ -8,6 +8,7 @@
 
 struct gol_req{
   GtkWidget *drawing_area;
+  cairo_surface_t *lines;
   short int **grid;
   short int **buffer;
 };
@@ -16,7 +17,7 @@ struct gol_req{
 
 /* Surface to store current scribbles */
 static cairo_surface_t *surface = NULL;
-static cairo_surface_t *lines = NULL;
+
 
 
 // MODULO FUNCTION (NOT REMAINDER) THAT RETURNS ONLY POSITVE INTEGERS
@@ -25,7 +26,7 @@ int mod(int a, int b){
     return r < 0 ? r + b : r;
 }
 
-void init_grid(GtkWidget *da, short int **grid, short int **buffer) {
+void init_grid(GtkWidget *da, cairo_surface_t *lines, short int **grid, short int **buffer) {
   int r = 140;
   int c = 217;
   double x1, y1, x2, y2;
@@ -152,7 +153,7 @@ gboolean game_of_life(gpointer data) {
   short int count;
   short int color;
   cr = cairo_create (surface);
-  cairo_set_source_surface(cr, lines, 0, 0);
+  cairo_set_source_surface(cr, info->lines, 0, 0);
   cairo_paint(cr);
   cairo_destroy (cr);
   cr = cairo_create (surface);
@@ -246,13 +247,15 @@ activate (GtkApplication *app,
 
   //-------------------- SET PERIODIC EXECUTION OF GAME OF LIFE --------------------
   // SURFACE TO STORE THE GRID BORDERS
-  init_grid (drawing_area, grid, buffer);
+  cairo_surface_t *lines = NULL;
+  init_grid (drawing_area, lines, grid, buffer);
   struct gol_req *info = malloc(sizeof(struct gol_req));
   info->drawing_area = drawing_area;
+  info->lines = lines;
   info->grid = grid;
   info->buffer = buffer;
   // g_time_out makes a periodic call to a specified function
-  g_timeout_add_full (G_PRIORITY_HIGH, (guint)28, (GSourceFunc)game_of_life, (gpointer)info, NULL);
+  g_timeout_add_full (G_PRIORITY_HIGH, (guint)26, (GSourceFunc)game_of_life, (gpointer)info, NULL);
 }
 
 
