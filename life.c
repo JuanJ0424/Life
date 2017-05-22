@@ -237,8 +237,6 @@ activate (GtkApplication *app,
   struct gol_req info;
   // info.drawing_area = drawing_area;
   // info.lines = lines;
-  r+=1;
-  c+=1;
   g_timeout_add_full (G_PRIORITY_HIGH, (guint)26, (GSourceFunc)game_of_life, drawing_area, NULL);
 }
 
