@@ -3,7 +3,7 @@
 
 
 int main(int argc, char const *argv[]) {
-  printf("%d\n", (-1)%7 );
+  printf("%d\n", (5/2));
 
   return 0;
 }

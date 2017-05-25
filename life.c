@@ -8,11 +8,21 @@
 
 struct gol_req{
   GtkWidget *drawing_area;
+  short int *r;
+  short int *c;
   short int **grid;
   short int **buffer;
+  short int ***memory;
+  short int *mem_size;
+  short int *mem_rule;
+  char *b;
+  char *s;
 };
 
-//gcc `pkg-config --cflags gtk+-3.0 libsodium` -o life life.c `pkg-config --libs gtk+-3.0 libsodium`
+void fill_memory(struct gol_req *info);
+void game_of_life(struct gol_req *info);
+
+//gcc `pkg-config --cflags gtk+-3.0 libsodium` -o life life.c -g `pkg-config --libs gtk+-3.0 libsodium`
 
 /* Surface to store current scribbles */
 static cairo_surface_t *surface = NULL;
@@ -25,9 +35,7 @@ int mod(int a, int b){
     return r < 0 ? r + b : r;
 }
 
-void init_grid(GtkWidget *da, short int **grid, short int **buffer) {
-  int r = 140;
-  int c = 217;
+void paint_grid_lines(struct gol_req *info) {
   double x1, y1, x2, y2;
   cairo_t *cr;
   cr = cairo_create(surface); //  Copy current state of surface in to another surface
@@ -40,28 +48,19 @@ void init_grid(GtkWidget *da, short int **grid, short int **buffer) {
   cairo_set_source_rgb(cr, 0, 0, 0);
   cairo_set_line_width (cr, 0.1);
   int i, j;
-  for (i = 1; i < r; i++) {
+  for (i = 1; i < *info->r; i++) {
     cairo_move_to(cr,0,(i*C_SIZE));
-    cairo_line_to(cr,C_SIZE*c,(i*C_SIZE));
+    cairo_line_to(cr,C_SIZE*(*info->c),(i*C_SIZE));
   }
-  for (j = 1; j < c; j++) {
+  for (j = 1; j < *info->c; j++) {
     cairo_move_to(cr,(j*C_SIZE),0);
-    cairo_line_to(cr,(j*C_SIZE),C_SIZE*r);
+    cairo_line_to(cr,(j*C_SIZE),C_SIZE*(*info->r));
   }
   cairo_stroke(cr);
   cairo_destroy(cr);
   cairo_create(surface);
   cairo_set_source_surface (cr,lines, 0, 0);
   cairo_paint(cr);
-  for (i = 0; i < r; i++) {
-    grid[i] = malloc(217*sizeof(short int));
-    buffer[i] = malloc(217*sizeof(short int));
-  }
-  for (i = 0; i < r; i++) {
-    for (j = 0; j < c; j++) {
-      grid[i][j] = randombytes_uniform(2);
-    }
-  }
 }
 
 static void clear_surface (void) {
@@ -143,55 +142,137 @@ short int do_count(short int i, short int j, short int **grid, int r, int c){
   return count;
 }
 
-gboolean game_of_life(gpointer data) {
-  int r = 140;
-  int c = 217;
-  struct gol_req *info = (struct gol_req *)data;
+short int evaluate_rule(char *b, char *s, short int *count, short int *value) {
+  char *semi_rule;
+  if (*value==1)
+    semi_rule = s;
+  else
+    semi_rule = b;
+  while(*semi_rule!='\0'){
+    if(*count == (*semi_rule-'0')) {
+      return 1;
+    }
+    semi_rule++;
+  }
+  return 0;
+}
+
+void game_of_life(struct gol_req *info) {
   short int i,j;
   cairo_t *cr;
   short int count;
-  short int color;
   cr = cairo_create (surface);
   cairo_set_source_surface(cr, lines, 0, 0);
   cairo_paint(cr);
   cairo_destroy (cr);
   cr = cairo_create (surface);
   cairo_set_source_rgb(cr, 0, 0, 0);
-  for (i = 0; i < r  ; i++) {
-    for (j = 0; j < c ; j++) {
-      count = do_count(i,j,info->grid, r, c);
-      if (info->grid[i][j] == 1) {
-        if (count == 2 || count == 3) {
-          info->buffer[i][j] = 1;
-          color = 1;
-        } else {
-          info->buffer[i][j] = 0;
-          color = 0;
-        }
-      } else if (info->grid[i][j] == 0) {
-        if (count == 3) {
-          info->buffer[i][j] = 1;
-          color = 1;
-        } else {
-          info->buffer[i][j] = 0;
-          color = 0;
-        }
-      }
-      if (color == 1) {
+  for (i = 0; i < *info->r  ; i++) {
+    for (j = 0; j < *info->c ; j++) {
+      count = do_count(i,j,info->grid, *info->r, *info->c);
+      info->buffer[i][j] = evaluate_rule(info->b, info->s, &count, &info->grid[i][j]);
+      if (info->buffer[i][j] == 1) {
         cairo_rectangle (cr, C_SIZE*j, C_SIZE*i, C_SIZE, C_SIZE);
       }
     }
   }
   cairo_fill (cr);
   gtk_widget_queue_draw (info->drawing_area);
-  for ( i = 0; i < r; i++) {
-    for ( j = 0; j < c; j++) {
+  for ( i = 0; i < *info->r; i++) {
+    for ( j = 0; j < *info->c; j++) {
       info->grid[i][j] = info->buffer[i][j];
     }
   }
   cairo_destroy (cr);
-  return TRUE;
 
+}
+
+void fill_memory(struct gol_req *info) {
+  int i,j;
+  for (i = 0; i < *info->r; i++) {
+    if(NULL ==(info->grid[i] = malloc(*(info->c)*sizeof(short int))))
+      printf("Ni el grid se pudo hacer\n");
+
+    if(NULL ==(info->buffer[i] = malloc(*(info->c)*sizeof(short int))))
+      printf("Ni el buffer se pudo hacer\n");
+  }
+  for (i = 0; i < *info->r; i++) {
+    for (j = 0; j < *info->c; j++) {
+      info->grid[i][j] = randombytes_uniform(2);
+    }
+  }
+  for(i = 0; i<(*info->mem_size); i++) {
+    game_of_life(info);
+    info->memory[i] = info->buffer;
+    info->buffer = NULL;
+    if (NULL==(info->buffer = malloc((*info->r)*sizeof(short int*))))
+      printf("No se le pudo asignar memoria al bufer en fill_memory %d\n", i);
+    for (j=0; j<*info->r; j++) {
+      if (NULL==(info->buffer[j] = malloc((*info->c)*sizeof(short int))))
+        printf("No se le asigno memoria a una fila de buffer en %d \n", i);
+    }
+  }
+}
+
+void memory_rule(struct gol_req *info){
+  //printf("Entramos a memory_rule\n");
+  int i,j,k;
+  short int count = 0;
+  short int min, may;
+  //printf("Filas en memory_rule %d, columnas en memory_rule %d\n",*info->r,*info->c );
+  for(int i = 0; i<*info->r; i++) {
+    for (int j = 0; j<*info->c; j++) {
+      count = 0;
+      //printf("Memory rule en %d, %d\n", i,j);
+      for (k = 0; k<*info->mem_size; k++) {
+        //printf("Valor en memoria %d = %d\n",k, info->memory[k][i][j]);
+        count += info->memory[k][i][j];
+      }
+      if(*info->mem_rule == -1) {
+        min = (*info->mem_size%2)==0?(*info->mem_size/2)-1:*info->mem_size/2;
+        if(count<=min)
+          info->grid[i][j] = 1;
+        else
+          info->grid[i][j] = 0;
+      } else if(*info->mem_rule == 0){
+        if(count==*info->mem_size/2)
+          info->grid[i][j] = 1;
+        else
+          info->grid[i][j] = 0;
+        //printf("count fue %d y la memory_rule es %d, el nuevo valor es %d\n",count, *info->mem_rule, info->grid[i][j] );
+      } else if(*info->mem_rule == 1) {
+        may = (*info->mem_size/2)+1;
+        if(count>=may)
+          info->grid[i][j] = 1;
+        else
+          info->grid[i][j] = 0;
+        //printf("count fue %d y la memory_rule es %d,may es %d, el nuevo valor es %d\n",count, *info->mem_rule, may, info->grid[i][j] );
+      }
+    }
+  }
+
+}
+
+void update_memory(struct gol_req *info) {
+  short int i;
+  short int **aux = NULL;
+  aux = info->memory[0];
+  for (i=0;i<(*info->mem_size)-1; i++) {
+    info->memory[i] = NULL;
+    info->memory[i] = info->memory[i+1];
+  }
+  info->memory[(*info->mem_size)-1] = NULL;
+  info->memory[(*info->mem_size)-1] = info->buffer;
+  info->buffer = NULL;
+  info->buffer = aux;
+}
+
+gboolean game_of_life_with_memory(gpointer data) {
+  struct gol_req *info = (struct gol_req *)data;
+  memory_rule(info);
+  game_of_life(info);
+  update_memory(info);
+  return TRUE;
 }
 
 static void
@@ -241,18 +322,44 @@ activate (GtkApplication *app,
                                      | GDK_BUTTON_PRESS_MASK
                                      | GDK_POINTER_MOTION_MASK);
   gtk_widget_show_all (window);
-  short int **grid = malloc(140*sizeof(short int*));
-  short int **buffer = malloc(140*sizeof(short int*));
 
-  //-------------------- SET PERIODIC EXECUTION OF GAME OF LIFE --------------------
-  // SURFACE TO STORE THE GRID BORDERS
-  init_grid (drawing_area, grid, buffer);
+
+  //-------------------- SET REQUIREMENTS --------------------
+  // SIZE OF GRID
+  short int *r = malloc(sizeof(short int));
+  short int *c = malloc(sizeof(short int));
+  *r = 140;
+  *c = 217;
+  // RULE
+  char *b = "3";
+  char *s = "23";
+  // MEMORY RULE -1 IF MINORY OF 1'S, 0 IF PARITY, 1 IF MAYORITY
+  short int *mem_rule = malloc(sizeof(short int));
+  *mem_rule = 1;
+  short int *mem_size = malloc(sizeof(short int));
+  *mem_size = 7;
+
+  // ARRAYS
+  short int **grid = malloc((*r)*sizeof(short int*));
+  short int **buffer = malloc((*r)*sizeof(short int*));
+  short int ***memory = malloc((*mem_size)*sizeof(short int**));
+  // printf("rule b[0] %d s[0] %d\n",b[0]-'0', s[0]-'0');
   struct gol_req *info = malloc(sizeof(struct gol_req));
   info->drawing_area = drawing_area;
+  info->r = r;
+  info->c = c;
   info->grid = grid;
   info->buffer = buffer;
+  info->memory = memory;
+  info->b = b;
+  info->s = s;
+  info->mem_rule = mem_rule;
+  info->mem_size = mem_size;
+  paint_grid_lines (info);
+  fill_memory(info);
+  //-------------------- SET PERIODIC EXECUTION OF GAME OF LIFE --------------------
   // g_time_out makes a periodic call to a specified function
-  g_timeout_add_full (G_PRIORITY_HIGH, (guint)28, (GSourceFunc)game_of_life, (gpointer)info, NULL);
+  g_timeout_add_full (G_PRIORITY_HIGH, (guint)28, (GSourceFunc)game_of_life_with_memory, (gpointer)info, NULL);
 }
 
 
