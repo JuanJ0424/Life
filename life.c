@@ -15,6 +15,7 @@ struct gol_req{
   short int ***memory;
   short int *mem_size;
   short int *mem_rule;
+  short int *initial_density;
   char *b;
   char *s;
 };
@@ -198,7 +199,11 @@ void fill_memory(struct gol_req *info) {
   }
   for (i = 0; i < *info->r; i++) {
     for (j = 0; j < *info->c; j++) {
-      info->grid[i][j] = randombytes_uniform(2);
+      if (randombytes_uniform(101)>(100-*info->initial_density)){
+          info->grid[i][j] = 1;
+      } else {
+        info->grid[i][j] = 0;
+      }
     }
   }
   for(i = 0; i<(*info->mem_size); i++) {
@@ -219,34 +224,52 @@ void memory_rule(struct gol_req *info){
   int i,j,k;
   short int count = 0;
   short int min, may;
-  //printf("Filas en memory_rule %d, columnas en memory_rule %d\n",*info->r,*info->c );
   for(int i = 0; i<*info->r; i++) {
     for (int j = 0; j<*info->c; j++) {
       count = 0;
-      //printf("Memory rule en %d, %d\n", i,j);
       for (k = 0; k<*info->mem_size; k++) {
-        //printf("Valor en memoria %d = %d\n",k, info->memory[k][i][j]);
         count += info->memory[k][i][j];
       }
+      // MINORITY OF 1's RULE
       if(*info->mem_rule == -1) {
         min = (*info->mem_size%2)==0?(*info->mem_size/2)-1:*info->mem_size/2;
-        if(count<=min)
+        if(count<=min) // NORMAL CONDITIONS
           info->grid[i][j] = 1;
         else
           info->grid[i][j] = 0;
+        // BREAK EQUALITY SITUATIONS BY USING THE MOST RECENT VALUE
+        if((*info->mem_size%2)==0 && count == min+1) {
+            info->grid[i][j] = info->memory[(*info->mem_size)-1][i][j];
+        }
+        // PARITY OF ANY NUMBER
       } else if(*info->mem_rule == 0){
-        if(count==*info->mem_size/2)
-          info->grid[i][j] = 1;
-        else
-          info->grid[i][j] = 0;
-        //printf("count fue %d y la memory_rule es %d, el nuevo valor es %d\n",count, *info->mem_rule, info->grid[i][j] );
+        if ((*info->mem_size%2)==0) { // MEMORY SIZE IS EVEN
+          if(count==*info->mem_size/2) //EQUAL NUMBER OF 1'S AND 0'S, THE LAST VALUE SURVIVES
+            info->grid[i][j] = info->memory[(*info->mem_size)-1][i][j];
+          else if (count%2==0)
+            info->grid[i][j] = 1;
+          else
+            info->grid[i][j] = 0;
+        } else { // MEMORY SIZE IS ODD, THE NUMBER THAT APPEARS EVEN NUMBER OF TIMES, SURVIVES
+          if(count%2==0)
+            info->grid[i][j] = 1;
+          else
+            info->grid[i][j] = 0;
+        }
       } else if(*info->mem_rule == 1) {
         may = (*info->mem_size/2)+1;
         if(count>=may)
           info->grid[i][j] = 1;
         else
           info->grid[i][j] = 0;
-        //printf("count fue %d y la memory_rule es %d,may es %d, el nuevo valor es %d\n",count, *info->mem_rule, may, info->grid[i][j] );
+        if((*info->mem_size%2)==0 && count == may-1) { // BREAK EQUALITY SITUATIONS BY USING THE MOST RECENT VALUE
+            info->grid[i][j] = info->memory[(*info->mem_size)-1][i][j];
+        }
+      } else if(*info->mem_rule == 2) { // EQUALITY RULE
+        if(count==*info->mem_size/2)
+          info->grid[i][j] = 1;
+        else
+          info->grid[i][j] = 0;
       }
     }
   }
@@ -328,17 +351,18 @@ activate (GtkApplication *app,
   // SIZE OF GRID
   short int *r = malloc(sizeof(short int));
   short int *c = malloc(sizeof(short int));
+  short int *initial_density = malloc(sizeof(short int));
   *r = 140;
   *c = 217;
   // RULE
   char *b = "3";
   char *s = "23";
+  *initial_density = 20;
   // MEMORY RULE -1 IF MINORY OF 1'S, 0 IF PARITY, 1 IF MAYORITY
   short int *mem_rule = malloc(sizeof(short int));
-  *mem_rule = 1;
+  *mem_rule = 0;
   short int *mem_size = malloc(sizeof(short int));
-  *mem_size = 7;
-
+  *mem_size = 12;
   // ARRAYS
   short int **grid = malloc((*r)*sizeof(short int*));
   short int **buffer = malloc((*r)*sizeof(short int*));
@@ -353,16 +377,16 @@ activate (GtkApplication *app,
   info->memory = memory;
   info->b = b;
   info->s = s;
+  info->initial_density = initial_density;
   info->mem_rule = mem_rule;
   info->mem_size = mem_size;
   paint_grid_lines (info);
   fill_memory(info);
+  // DENSIDAD, TAMAÑO, MEMORIA, NUMERO
   //-------------------- SET PERIODIC EXECUTION OF GAME OF LIFE --------------------
   // g_time_out makes a periodic call to a specified function
-  g_timeout_add_full (G_PRIORITY_HIGH, (guint)28, (GSourceFunc)game_of_life_with_memory, (gpointer)info, NULL);
+  g_timeout_add_full (G_PRIORITY_HIGH, (guint)2000, (GSourceFunc)game_of_life_with_memory, (gpointer)info, NULL);
 }
-
-
 
 int main (int argc, char **argv) {
   GtkApplication *app;
@@ -371,10 +395,6 @@ int main (int argc, char **argv) {
   app = gtk_application_new ("org.gtk.example", G_APPLICATION_FLAGS_NONE);
   g_signal_connect (app, "activate", G_CALLBACK (activate), NULL);
   status = g_application_run (G_APPLICATION (app), argc, argv);
-
   g_object_unref (app);
-
-
-
   return status;
 }
