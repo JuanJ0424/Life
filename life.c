@@ -32,6 +32,7 @@ struct gol_req{
     char *rand;
     char *reset;
     short int *delay;
+    
 };
 
 void fill_memory(struct gol_req *info);
@@ -145,8 +146,6 @@ draw_cb (GtkWidget *widget,
 static void close_window (GtkApplication *app) {
     if (surface)
         cairo_surface_destroy (surface);
-    printf("close_window ejecutado");
-    printf("tipo 3 %s", G_OBJECT_TYPE_NAME(G_APPLICATION(app)));
     g_application_quit(G_APPLICATION(app));
     
 }
@@ -205,6 +204,8 @@ void game_of_life(struct gol_req *info) {
 }
 
 void allocate_grid (struct gol_req *info) {
+    info->grid = malloc((*info->r)*sizeof(short int*));
+    info->buffer = malloc((*info->r)*sizeof(short int*));
     int i, j;
     for (i = 0; i < *info->r; i++) {
         if(NULL ==(info->grid[i] = malloc(*(info->c)*sizeof(short int))))
@@ -228,16 +229,16 @@ void allocate_life_memory(struct gol_req *info) {
 }
 
 void free_life_memory(struct gol_req *info) {
-    int i, j, k;
-    for(i=0; i<(*info->mem_size); i++) {
-        for(j=0; j<(*info->r); j++) {
-            for(k=0; k<(*info->c); k++) {
-             //   free(info->memory[i][j][k]);
-            }
-            free(info->memory[i][j]);
-        }
-        free(info->memory[i]);
-    }
+//    int i, j, k;
+//    for(i=0; i<(*info->mem_size); i++) {
+//        for(j=0; j<(*info->r); j++) {
+//            for(k=0; k<(*info->c); k++) {
+//             //   free(info->memory[i][j][k]);
+//            }
+//            free(info->memory[i][j]);
+//        }
+//        free(info->memory[i]);
+//    }
     free(info->memory);
 }
 
@@ -256,12 +257,23 @@ void random_initial_grid (struct gol_req * info) {
 
 void fill_memory(struct gol_req *info) {
     int i,j;
-    short int **aux = info->buffer;
     for(i = 0; i<(*info->mem_size); i++) {
-        info->buffer = info->memory[i];
         game_of_life(info);
+        info->memory[i] = info->buffer;
+        info->buffer = NULL;
+        if (NULL==(info->buffer = malloc((*info->r)*sizeof(short int*))))
+            printf("No se le pudo asignar memoria al bufer en fill_memory %d\n", i);
+        for (j=0; j<*info->r; j++) {
+            if (NULL==(info->buffer[j] = malloc((*info->c)*sizeof(short int))))
+                printf("No se le asigno memoria a una fila de buffer en %d \n", i);
+        }
     }
-    info->buffer = aux;
+//    short int **aux = info->buffer;
+//    for(i = 0; i<(*info->mem_size); i++) {
+//        info->buffer = info->memory[i];
+//        game_of_life(info);
+//    }
+//    info->buffer = aux;
 }
 
 
@@ -272,7 +284,6 @@ void memory_rule(struct gol_req *info){
     int i,j,k;
     short int count = 0;
     short int min, may;
-    
     for(int i = 0; i<*info->r; i++) {
         for (int j = 0; j<*info->c; j++) {
             count = 0;
@@ -319,7 +330,6 @@ void memory_rule(struct gol_req *info){
                     info->grid[i][j] = 1;
                 else
                     info->grid[i][j] = 0;
-       
             }
         }
     }
@@ -342,9 +352,6 @@ void update_memory(struct gol_req *info) {
 
 gboolean game_of_life_with_memory(gpointer data) {
     struct gol_req *info = (struct gol_req *)data;
-//    printf("b %s\n", info->b);
-//    printf("s %s\n", info->s);
-//    printf("mem_size %d\n", *info->mem_size);
     memory_rule(info);
     game_of_life(info);
     update_memory(info);
@@ -355,19 +362,18 @@ static void start_game_of_life(GtkButton *button,
                                gpointer   data){
     struct gol_req *info = (struct gol_req *)data;
 
-    if (*info->f_e == 0x01) {
-        printf("Primera ejecucion");
-        *info->f_e = 0x00;
-        *info->reset = 0x01;
-        *info->t_a = 0x01;
+    if (*info->f_e == 0x01) { // if its the first execution of the current rule configuration
+        printf("------------------\n");
+        *info->f_e = 0x00; // now it won't be the first execution
+        *info->reset = 0x01; // The memory has to be reset if the reset button is pressed
+        *info->t_a = 0x01; // The timeout (periodic call) to game_of_life_with_memory is going to be active now
+        // Retrieve values from GUI
         *info->initial_density = (short int)gtk_range_get_value(GTK_RANGE(info->density_scale));
         *info->mem_size = (short int) gtk_range_get_value(GTK_RANGE(info->mem_size_scale));
         info->b = gtk_entry_get_text(info->bentry);
         info->s = gtk_entry_get_text(info->sentry);
-        //strcpy(info->b, gtk_entry_get_text(info->bentry));
-        //strcpy(info->s, gtk_entry_get_text(info->sentry));
         *info->delay = (short int) gtk_range_get_value(GTK_RANGE(info->delay_scale));
-        //printf("Antes %s\n",gtk_combo_box_text_get_active_text(info->mem_rule_combo) );
+        
         if (!strcmp("Minoria", gtk_combo_box_text_get_active_text(info->mem_rule_combo))) {
             printf("d minoria\n");
             *info->mem_rule = -1;
@@ -381,23 +387,27 @@ static void start_game_of_life(GtkButton *button,
             printf("otro %s",gtk_combo_box_text_get_active_text(info->mem_rule_combo) );
             *info->mem_rule = 2;
         }
-        printf("Antes %s\n",gtk_combo_box_text_get_active_text(info->mem_rule_combo) );
-        printf("b %s\n", info->b);
-        printf("s %s\n", info->s);
-        printf("mem_size %d\n", *info->mem_size);
-        printf("init den %d\n", *info->initial_density);
-        printf("delay %d\n", *info->delay);
+        // Logging to know wheter the retrieved values are ok
+        printf("b: %s\n", info->b);
+        printf("s: %s\n", info->s);
+        printf("Tamanio memoria: %d\n", *info->mem_size);
+        printf("Densidad: %d\n", *info->initial_density);
+        printf("Delay: %d\n", *info->delay);
         
         allocate_life_memory(info);
-        random_initial_grid(info);
+        if (*info->rand == 0x01) {
+         random_initial_grid(info);
+        }
         fill_memory(info);
         
+        //-------------------- SET PERIODIC EXECUTION OF GAME OF LIFE --------------------
+        // g_time_out makes a periodic call to a specified function
         info->id_timeout =  g_timeout_add_full (G_PRIORITY_HIGH, (guint)*info->delay, (GSourceFunc)game_of_life_with_memory, (gpointer)info, NULL);
     } else {
-        if(*info->t_a == 0x00) {
+        if(*info->t_a == 0x00) { // Just add the timeout if is not already set
             *info->delay = (short int) gtk_range_get_value(GTK_RANGE(info->delay_scale));
             info->id_timeout =  g_timeout_add_full (G_PRIORITY_HIGH, (guint)*info->delay, (GSourceFunc)game_of_life_with_memory, (gpointer)info, NULL);
-            *info->t_a = 0x01;
+            *info->t_a = 0x01; // The timeout has been set
         }
     }
     
@@ -405,27 +415,91 @@ static void start_game_of_life(GtkButton *button,
 static void stop_game_of_life(GtkButton *button,
                                gpointer   data){
     struct gol_req *info = (struct gol_req *)data;
-    if(*info->t_a == 0x01) {
+    if(*info->t_a == 0x01) { // Just try to remove the timeout if it is active
         g_source_remove(info->id_timeout);
-        *info->t_a = 0x00;
+        *info->t_a = 0x00; // The timeout is not active anymore
     }
     
 }
 static void reset_game_of_life(GtkButton *button,
                               gpointer   data){
     struct gol_req *info = (struct gol_req *)data;
-    *info->f_e = 0x01;
-    if(*info->t_a == 0x01) {
+    if(*info->t_a == 0x01) { // Just try to remove the timeout if it is active
         g_source_remove(info->id_timeout);
-        *info->t_a = 0x00;
+        *info->t_a = 0x00; // The timeout is not active anymore
     }
-    if(*info->reset == 0x01) {
-        free_life_memory(info);
-        *info->reset = 0x00;
+    if(*info->reset == 0x01) { // Check if the memory has not been reset yet
+        *info->f_e = 0x01; // It will be the first execution of the new configuration
+        free_life_memory(info); // Free all the gol memory, because a new mem size could've been selected
+        *info->reset = 0x00; // Mark that the memory reset is already done
     }
-    paint_grid_lines(info);
-    gtk_widget_queue_draw (info->drawing_area);
+    paint_grid_lines(info); // Paint an empty grid
+    gtk_widget_queue_draw (info->drawing_area); // Request render
 
+}
+
+static void
+draw_brush (GtkWidget *widget,
+            gdouble    x,
+            gdouble    y, struct gol_req *info)
+{
+    int xreal, yreal;
+    cairo_t *cr;
+    if (*info->t_a==0x00) {
+        cr = cairo_create (surface);
+        xreal = (int)x;
+        yreal = (int)y;
+        xreal = xreal/C_SIZE;
+        yreal = yreal/C_SIZE;
+        info->grid[x][y] = 1;
+        *info->rand = 0x00;
+        cairo_rectangle (cr, C_SIZE*xreal, C_SIZE*yreal, C_SIZE, C_SIZE);
+        cairo_fill (cr);
+        
+        cairo_destroy (cr);
+        
+        /* Now invalidate the affected region of the drawing area. */
+        gtk_widget_queue_draw_area (widget, C_SIZE*x, C_SIZE*y, C_SIZE, C_SIZE);
+    }
+}
+
+static gboolean
+button_press_event_cb (GtkWidget      *widget,
+                       GdkEventButton *event,
+                       gpointer        data)
+{
+    /* paranoia check, in case we haven't gotten a configure event */
+    if (surface == NULL)
+        return FALSE;
+    struct gol_req *info = (struct gol_req *)data;
+    if (event->button == GDK_BUTTON_PRIMARY)
+    {
+        draw_brush (widget, event->x, event->y, info);
+    }
+    else if (event->button == GDK_BUTTON_SECONDARY)
+    {
+        clear_surface ();
+        gtk_widget_queue_draw (widget);
+    }
+    
+    /* We've handled the event, stop processing */
+    return TRUE;
+}
+
+static gboolean
+motion_notify_event_cb (GtkWidget      *widget,
+                        GdkEventMotion *event,
+                        gpointer        data)
+{
+    /* paranoia check, in case we haven't gotten a configure event */
+    if (surface == NULL)
+        return FALSE;
+    struct gol_req *info = (struct gol_req *)data;
+    if (event->state & GDK_BUTTON1_MASK)
+        draw_brush (widget, event->x, event->y, info);
+    
+    /* We've handled it, stop processing */
+    return TRUE;
 }
 
 static void
@@ -474,7 +548,7 @@ activate (GtkApplication *app,
     GtkLabel *blabel = gtk_label_new("B");
     gtk_grid_attach(GTK_GRID(pgrid), blabel, 0, 1, 2, 1);
     gtk_label_set_justify(blabel, GTK_JUSTIFY_CENTER);
-    GtkEntry *bentry = gtk_entry_new_with_buffer(gtk_entry_buffer_new("2", 1));
+    GtkEntry *bentry = gtk_entry_new_with_buffer(gtk_entry_buffer_new("3", 1));
     gtk_grid_attach(pgrid, bentry, 2, 1, 2, 1);
 
     GtkLabel *slabel = gtk_label_new("S");
@@ -536,11 +610,6 @@ activate (GtkApplication *app,
     g_signal_connect (drawing_area,"configure-event",
                       G_CALLBACK (configure_event_cb), NULL);
     
-    /* Event signals */
-    // g_signal_connect (drawing_area, "motion-notify-event",
-    //                   G_CALLBACK (motion_notify_event_cb), NULL);
-    // g_signal_connect (drawing_area, "button-press-event",
-    //                   G_CALLBACK (button_press_event_cb), NULL);
     
     /* Ask to receive events the drawing area doesn't normally
      * subscribe to. In particular, we need to ask for the
@@ -559,21 +628,14 @@ activate (GtkApplication *app,
     // SIZE OF GRID
     info->r = malloc(sizeof(short int));
     info->c = malloc(sizeof(short int));
-    info->initial_density = malloc(sizeof(short int));
     *info->r = 140;
     *info->c = 217;
-    // RULE
-//    info->b = "2";
-//    info->s = "23";
-    //*info->initial_density = 80;
-    // MEMORY RULE -1 IF MINORY OF 1'S, 0 IF PARITY, 1 IF MAYORITY
+    
+    info->initial_density = malloc(sizeof(short int));
+
     info->mem_rule = malloc(sizeof(short int));
-    //*info->mem_rule = 1;
     info->mem_size = malloc(sizeof(short int));
-    //*info->mem_size = 1;
-    // ARRAYS
-    info->grid = malloc((*info->r)*sizeof(short int*));
-    info->buffer = malloc((*info->r)*sizeof(short int*));
+    
     // printf("rule b[0] %d s[0] %d\n",b[0]-'0', s[0]-'0');
     
     info->drawing_area = drawing_area;
@@ -587,21 +649,21 @@ activate (GtkApplication *app,
     *info->f_e = 0x01;
     info->delay_scale = delay_scale;
     info->delay = malloc(sizeof(short int));
-    //*info->delay = 50;
     info->reset = malloc(sizeof(char));
     *info->reset = 0x00;
     info->t_a = malloc(sizeof(char));
     *info->t_a = 0x00;
+    *info->rand = 0x01;
+    
     allocate_grid(info);
     paint_grid_lines (info);
     
-    // DENSIDAD, TAMAÑO, MEMORIA, NUMERO
-    //-------------------- SET PERIODIC EXECUTION OF GAME OF LIFE --------------------
-    // g_time_out makes a periodic call to a specified function
     printf("info %p\n",info);
     g_signal_connect (G_OBJECT(play), "clicked", G_CALLBACK (start_game_of_life), (gpointer)&(*info));
     g_signal_connect (G_OBJECT(stop), "clicked", G_CALLBACK (stop_game_of_life), (gpointer)&(*info));
     g_signal_connect (G_OBJECT(reset), "clicked", G_CALLBACK (reset_game_of_life), (gpointer)&(*info));
+    g_signal_connect (drawing_area, "motion-notify-event",G_CALLBACK (motion_notify_event_cb), (gpointer)&(*info));
+    g_signal_connect (drawing_area, "button-press-event",G_CALLBACK (button_press_event_cb), (gpointer)&(*info));
 }
 
 int main (int argc, char **argv) {
